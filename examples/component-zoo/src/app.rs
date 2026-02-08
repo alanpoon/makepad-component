@@ -152,7 +152,7 @@ live_design! {
                         <SubsectionLabel> { text: "FlexibleDataTable" }
                         <FlexibleDataTable> {
                             width: Fill,
-                            height: 500,
+                            height: Fit,
                         }
                     }
                     // Category Tab Bar

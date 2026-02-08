@@ -318,6 +318,11 @@ pub struct FlexibleDataTable {
     /// Row data
     #[rust]
     rows: Vec<FlexRow>,
+
+    /// Cells where the dropdown/textinput/colorpicker views should be hidden
+    /// Each tuple is (row_index, column_index)
+    #[rust]
+    hidden_cells: Vec<(usize, usize)>,
 }
 impl LiveHook for FlexibleDataTable {
     fn after_new_from_doc(&mut self, _cx:&mut Cx) {
@@ -342,7 +347,9 @@ const HEADER_IDS: [&[LiveId]; MAX_COLUMNS] = [
 ];
 
 impl Widget for FlexibleDataTable {
-    fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
+/*************  ✨ Windsurf Command ⭐  *************/
+/// Handle an event on the widget. This function is called when an event occurs on the widget. It is responsible for handling the event and updating the widget's state accordingly.
+/*******  864958fa-7881-4335-a78c-707f8da09a71  *******/    fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
         self.view.handle_event(cx, event, scope);
         self.widget_match_event(cx, event, scope);
     }
@@ -483,6 +490,11 @@ impl FlexibleDataTable {
         }
     }
 
+    /// Check if a cell is in the hidden list
+    fn is_cell_hidden(&self, row_idx: usize, col_idx: usize) -> bool {
+        self.hidden_cells.contains(&(row_idx, col_idx))
+    }
+
     /// Draw cells for a single row
     fn draw_row_cells(&self, cx: &mut Cx, row_widget: &WidgetRef, row_idx: usize) {
         let row_data = &self.rows[row_idx];
@@ -500,6 +512,9 @@ impl FlexibleDataTable {
                     width: (col_config.width)
                 });
 
+                // Check if this cell should have its view hidden
+                let is_hidden = self.is_cell_hidden(row_idx, col_idx);
+
                 // Configure and show the appropriate widget type
                 let dropdown = cell.drop_down(ids!(dropdown));
                 let text_input = cell.text_input(ids!(text_input));
@@ -507,34 +522,42 @@ impl FlexibleDataTable {
                 let dropdown_view = cell.view(ids!(dropdown_view));
                 let text_input_view = cell.view(ids!(text_input_view));
                 let color_picker_view = cell.view(ids!(color_picker_view));
-                match col_config.cell_type {
-                    CellType::DropDown => {
-                        dropdown_view.set_visible(cx, true);
-                        text_input_view.set_visible(cx, false);
-                        color_picker_view.set_visible(cx, false);
 
-                        dropdown.set_labels(cx, col_config.dropdown_labels.clone());
-                        if let Some(CellValue::DropDown(idx)) = cell_value {
-                            dropdown.set_selected_item(cx, *idx);
+                if is_hidden {
+                    // Hide all views for this cell
+                    dropdown_view.set_visible(cx, false);
+                    text_input_view.set_visible(cx, false);
+                    color_picker_view.set_visible(cx, false);
+                } else {
+                    match col_config.cell_type {
+                        CellType::DropDown => {
+                            dropdown_view.set_visible(cx, true);
+                            text_input_view.set_visible(cx, false);
+                            color_picker_view.set_visible(cx, false);
+
+                            dropdown.set_labels(cx, col_config.dropdown_labels.clone());
+                            if let Some(CellValue::DropDown(idx)) = cell_value {
+                                dropdown.set_selected_item(cx, *idx);
+                            }
                         }
-                    }
-                    CellType::TextInput => {
-                        dropdown_view.set_visible(cx, false);
-                        text_input_view.set_visible(cx, true);
-                        color_picker_view.set_visible(cx, false);
+                        CellType::TextInput => {
+                            dropdown_view.set_visible(cx, false);
+                            text_input_view.set_visible(cx, true);
+                            color_picker_view.set_visible(cx, false);
 
-                        if let Some(CellValue::Text(text)) = cell_value {
-                            text_input.set_text(cx, text);
+                            if let Some(CellValue::Text(text)) = cell_value {
+                                text_input.set_text(cx, text);
+                            }
                         }
-                    }
-                    CellType::ColorPicker => {
-                        dropdown_view.set_visible(cx, false);
-                        text_input_view.set_visible(cx, false);
-                        color_picker_view.set_visible(cx, true);
+                        CellType::ColorPicker => {
+                            dropdown_view.set_visible(cx, false);
+                            text_input_view.set_visible(cx, false);
+                            color_picker_view.set_visible(cx, true);
 
-                        if let Some(CellValue::Color(color)) = cell_value {
-                            let hsv = Hsv::from_rgb(color.x, color.y, color.z, color.w);
-                            color_picker.set_color(cx, hsv);
+                            if let Some(CellValue::Color(color)) = cell_value {
+                                let hsv = Hsv::from_rgb(color.x, color.y, color.z, color.w);
+                                color_picker.set_color(cx, hsv);
+                            }
                         }
                     }
                 }
@@ -616,6 +639,34 @@ impl FlexibleDataTable {
         if let Some(col) = self.columns.get_mut(col_idx) {
             col.dropdown_labels = labels;
         }
+    }
+
+    /// Set the list of hidden cells (replaces existing list)
+    pub fn set_hidden_cells(&mut self, cells: Vec<(usize, usize)>) {
+        self.hidden_cells = cells;
+    }
+
+    /// Get the list of hidden cells
+    pub fn get_hidden_cells(&self) -> &[(usize, usize)] {
+        &self.hidden_cells
+    }
+
+    /// Add a cell to the hidden list
+    pub fn add_hidden_cell(&mut self, row_idx: usize, col_idx: usize) {
+        let cell = (row_idx, col_idx);
+        if !self.hidden_cells.contains(&cell) {
+            self.hidden_cells.push(cell);
+        }
+    }
+
+    /// Remove a cell from the hidden list
+    pub fn remove_hidden_cell(&mut self, row_idx: usize, col_idx: usize) {
+        self.hidden_cells.retain(|&c| c != (row_idx, col_idx));
+    }
+
+    /// Clear all hidden cells
+    pub fn clear_hidden_cells(&mut self) {
+        self.hidden_cells.clear();
     }
 }
 
@@ -740,5 +791,46 @@ impl FlexibleDataTableRef {
             }
         }
         None
+    }
+
+    /// Set the list of hidden cells and redraw
+    pub fn set_hidden_cells(&self, cx: &mut Cx, cells: Vec<(usize, usize)>) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_hidden_cells(cells);
+            inner.redraw(cx);
+        }
+    }
+
+    /// Get the list of hidden cells
+    pub fn get_hidden_cells(&self) -> Vec<(usize, usize)> {
+        if let Some(inner) = self.borrow() {
+            inner.get_hidden_cells().to_vec()
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Add a cell to the hidden list and redraw
+    pub fn add_hidden_cell(&self, cx: &mut Cx, row_idx: usize, col_idx: usize) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.add_hidden_cell(row_idx, col_idx);
+            inner.redraw(cx);
+        }
+    }
+
+    /// Remove a cell from the hidden list and redraw
+    pub fn remove_hidden_cell(&self, cx: &mut Cx, row_idx: usize, col_idx: usize) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.remove_hidden_cell(row_idx, col_idx);
+            inner.redraw(cx);
+        }
+    }
+
+    /// Clear all hidden cells and redraw
+    pub fn clear_hidden_cells(&self, cx: &mut Cx) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.clear_hidden_cells();
+            inner.redraw(cx);
+        }
     }
 }
