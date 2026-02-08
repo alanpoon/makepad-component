@@ -324,19 +324,10 @@ impl LiveHook for FlexibleDataTable {
         self.columns = vec![
             ColumnConfig::dropdown("Name", vec!["one".to_string(), "two".to_string(), "three".to_string()], 100.0),
             ColumnConfig::text_input("Textinput", 100.0),
-            //ColumnConfig::color_picker("ColorPicker", 150.0),
+            ColumnConfig::color_picker("ColorPicker", 150.0),
         ];
-        self.rows = vec![FlexRow::new(&self.columns)
-        //, FlexRow::new(&self.columns)
-        ];
+        self.rows = vec![FlexRow::new(&self.columns)];
     }
-    // (&mut self, cx: &mut Cx, _apply: &mut Apply, _index: usize, _nodes: &[LiveNode]) {
-    //     // Initialize with default data if empty
-    //     if self.columns.is_empty() {
-            
-    //         self.redraw(cx);
-    //     }
-    // }
 }
 
 // Static cell IDs for accessing cells
