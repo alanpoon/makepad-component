@@ -76,6 +76,19 @@ live_design! {
         cell_7 = <FlexCell> {}
         cell_8 = <FlexCell> {}
         cell_9 = <FlexCell> {}
+
+        minus_btn = <Button> {
+            width: 30, height: 30
+            text: "-"
+            draw_text: {
+                text_style: {font_size: 16.0}
+            }
+            draw_bg: {
+                fn pixel(self) -> vec4 {
+                    return mix(#e24a4a, #f25a5a, self.hover);
+                }
+            }
+        }
     }
 
     // Header cell label
@@ -122,6 +135,11 @@ live_design! {
             header_7 = <FlexHeaderCell> {}
             header_8 = <FlexHeaderCell> {}
             header_9 = <FlexHeaderCell> {}
+
+            // Empty header for the minus button column
+            header_minus = <View> {
+                width: 30, height: Fit
+            }
         }
 
         // Rows using PortalList
@@ -142,7 +160,7 @@ live_design! {
 
             add_row_btn = <Button> {
                 width: 100, height: 30
-                text: "Add Row"
+                text: "+ Row"
                 draw_bg: {
                     fn pixel(self) -> vec4 {
                         return mix((COLOR_PRIMARY), (COLOR_HOVER), self.hover);
@@ -301,6 +319,8 @@ pub enum FlexibleDataTableAction {
     CellChanged(usize, usize, CellValue),
     /// Add row button was clicked
     AddRowClicked,
+    /// Minus row button was clicked (contains the row index that was removed)
+    MinusRowClicked(usize),
     /// No action
     None,
 }
@@ -396,12 +416,20 @@ impl WidgetMatchEvent for FlexibleDataTable {
             );
         }
 
-        // Handle cell changes in the portal list
+        // Handle cell changes and minus button in the portal list
         let list_widget = self.view.portal_list(ids!(rows_list));
+
+        // Collect row to remove (only one per action cycle)
+        let mut row_to_remove: Option<usize> = None;
 
         for (row_idx, row_widget) in list_widget.items_with_actions(actions) {
             if row_idx >= self.rows.len() {
                 continue;
+            }
+
+            // Check if minus button was clicked for this row
+            if row_widget.button(ids!(minus_btn)).clicked(actions) {
+                row_to_remove = Some(row_idx);
             }
 
             // Check each column for changes
@@ -469,6 +497,17 @@ impl WidgetMatchEvent for FlexibleDataTable {
                     }
                 }
             }
+        }
+
+        // Remove the row after the loop to avoid borrow issues
+        if let Some(row_idx) = row_to_remove {
+            self.rows.remove(row_idx);
+            self.redraw(cx);
+            cx.widget_action(
+                self.widget_uid(),
+                &scope.path,
+                FlexibleDataTableAction::MinusRowClicked(row_idx),
+            );
         }
     }
 }
@@ -781,6 +820,16 @@ impl FlexibleDataTableRef {
         } else {
             false
         }
+    }
+
+    /// Check if minus_row_btn was clicked, returns the removed row index
+    pub fn minus_row_clicked(&self, actions: &Actions) -> Option<usize> {
+        if let Some(item) = actions.find_widget_action(self.widget_uid()) {
+            if let FlexibleDataTableAction::MinusRowClicked(idx) = item.cast() {
+                return Some(idx);
+            }
+        }
+        None
     }
 
     /// Check if any cell changed, returns (row_index, col_index, new_value)
