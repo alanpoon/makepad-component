@@ -41,14 +41,12 @@ live_design! {
                 }
             }
         }
-        
-        color_picker_view = <View> {
-            width: Fill, height: 40
-            color_picker = <MpColorPicker> {
-                width: Fill, height: 40
-            }
+
+        // Color picker directly without wrapper - wrapper with fixed height clips popup
+        color_picker = <MpColorPicker> {
+            width: Fill, height: Fit
         }
-        
+
     }
 
     // A single row with pre-defined column slots (up to 10)
@@ -367,9 +365,7 @@ const HEADER_IDS: [&[LiveId]; MAX_COLUMNS] = [
 ];
 
 impl Widget for FlexibleDataTable {
-/*************  ✨ Windsurf Command ⭐  *************/
-/// Handle an event on the widget. This function is called when an event occurs on the widget. It is responsible for handling the event and updating the widget's state accordingly.
-/*******  864958fa-7881-4335-a78c-707f8da09a71  *******/    fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
+    fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
         self.view.handle_event(cx, event, scope);
         self.widget_match_event(cx, event, scope);
     }
@@ -474,25 +470,21 @@ impl WidgetMatchEvent for FlexibleDataTable {
                         }
                     }
                     CellType::ColorPicker => {
-                        // Iterate through actions directly since widget_uid matching
-                        // doesn't work reliably for nested widgets in PortalList
-                        for action in actions {
-                            if let MpColorPickerAction::Changed(hsv) = action.cast() {
-                                let color = hsv.to_vec4();
-                                self.rows[row_idx].set(col_idx, CellValue::Color(color));
-                                println!("Color changed: {color:?}");
-                                cx.widget_action(
-                                    self.widget_uid(),
-                                    &scope.path,
-                                    FlexibleDataTableAction::CellChanged(
-                                        row_idx,
-                                        col_idx,
-                                        CellValue::Color(color),
-                                    ),
-                                );
-                                cx.redraw_all();
-                                break;
-                            }
+                        // Access color picker directly (not through wrapper view)
+                        let color_picker = cell.mp_color_picker(ids!(color_picker));
+                        if let Some(hsv) = color_picker.changed(actions) {
+                            let color = hsv.to_vec4();
+                            self.rows[row_idx].set(col_idx, CellValue::Color(color));
+                            cx.widget_action(
+                                self.widget_uid(),
+                                &scope.path,
+                                FlexibleDataTableAction::CellChanged(
+                                    row_idx,
+                                    col_idx,
+                                    CellValue::Color(color),
+                                ),
+                            );
+                            cx.redraw_all();
                         }
                     }
                 }
@@ -560,19 +552,18 @@ impl FlexibleDataTable {
                 let color_picker = cell.mp_color_picker(ids!(color_picker));
                 let dropdown_view = cell.view(ids!(dropdown_view));
                 let text_input_view = cell.view(ids!(text_input_view));
-                let color_picker_view = cell.view(ids!(color_picker_view));
 
                 if is_hidden {
                     // Hide all views for this cell
                     dropdown_view.set_visible(cx, false);
                     text_input_view.set_visible(cx, false);
-                    color_picker_view.set_visible(cx, false);
+                    color_picker.set_visible(cx, false);
                 } else {
                     match col_config.cell_type {
                         CellType::DropDown => {
                             dropdown_view.set_visible(cx, true);
                             text_input_view.set_visible(cx, false);
-                            color_picker_view.set_visible(cx, false);
+                            color_picker.set_visible(cx, false);
 
                             dropdown.set_labels(cx, col_config.dropdown_labels.clone());
                             if let Some(CellValue::DropDown(idx)) = cell_value {
@@ -582,7 +573,7 @@ impl FlexibleDataTable {
                         CellType::TextInput => {
                             dropdown_view.set_visible(cx, false);
                             text_input_view.set_visible(cx, true);
-                            color_picker_view.set_visible(cx, false);
+                            color_picker.set_visible(cx, false);
 
                             if let Some(CellValue::Text(text)) = cell_value {
                                 text_input.set_text(cx, text);
@@ -591,7 +582,7 @@ impl FlexibleDataTable {
                         CellType::ColorPicker => {
                             dropdown_view.set_visible(cx, false);
                             text_input_view.set_visible(cx, false);
-                            color_picker_view.set_visible(cx, true);
+                            color_picker.set_visible(cx, true);
 
                             if let Some(CellValue::Color(color)) = cell_value {
                                 let hsv = Hsv::from_rgb(color.x, color.y, color.z, color.w);
